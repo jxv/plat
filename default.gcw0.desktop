@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Plat
+Comment=3d puzzle platformer
+Exec=plat
+Terminal=false
+Type=Application
+StartupNotify=true
+Icon=icon
+Categories=games;
+
