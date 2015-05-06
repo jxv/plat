@@ -17,12 +17,14 @@ const int window_w = 320 * 2;
 const int window_h = 240 * 2;
 #endif
 
+#define SIZE (5 * 4)
+
 struct attrib {
 	GLuint program;
 	GLuint position;
 	GLuint normal;
-	GLuint uv;
 	GLuint matrix;
+	GLuint uv;
 	GLuint sampler;
 	GLuint camera;
 	GLuint timer;
@@ -32,9 +34,10 @@ struct attrib {
 	GLuint extra4;
 
 	GLuint color;
-	GLuint mvp;
+	m4f mvp;
 	v3f angle;
 	v3f scale;
+	v3f translate;
 };
 
 char *load_file(const char *path) {
@@ -228,35 +231,49 @@ const float _colors[] = {
 	0.6, 0.0, 1.0, // blue
 };
 
-static void render(unsigned int width, unsigned int height, struct attrib* data) {
-	m4f m_mv, m_scale, m_rotate, m_translate, m_p, m_mvp;
-
-	// Reshape cube
-	m_scale = scalem4f(eyem4f(), mkv3f(1.0,1.0,1.0));
-	// Do some rotation with Euler angles. It is not a fixed axis as
-	// quaterions would be, but the effect is cool. 
-	m_rotate = mulm4f(rotm4f(data->angle.x, mkv3f(1,0,0)), eyem4f());
-	m_rotate = mulm4f(rotm4f(data->angle.y, mkv3f(0,1,0)), m_rotate);
-	m_rotate = mulm4f(rotm4f(data->angle.z, mkv3f(0,0,1)), m_rotate);
-	// Move back from camera
-	m_translate = translatem4f(mkv3f(0, 0, -5.5));
-	// Combine matrices
-	m_mv = addm4f(mulm4f(m_rotate, m_scale), m_translate);
-	
-	m_p = perspm4f(45, (float)width / (float)height, 0.01, 100);
-	m_mvp = mulm4f(m_p, m_mv);
-	glUniformMatrix4fv(data->mvp, 1, GL_FALSE, m_mvp.val);
-	data->angle = addv3f(data->angle, mkv3f(0.03, 0.02, 0.01));
-	glClearColor(0.2, 0.2, 0.2, 1);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
+void update_mvp(const m4f persp, struct attrib *attrib) {
+	const m4f scale = scalem4f(eyem4f(), attrib->scale);
+	m4f rotate;
+	rotate = mulm4f(rotm4f(attrib->angle.x, mkv3f(1,0,0)), eyem4f());
+	rotate = mulm4f(rotm4f(attrib->angle.y, mkv3f(0,1,0)), rotate);
+	rotate = mulm4f(rotm4f(attrib->angle.z, mkv3f(0,0,1)), rotate);
+	const m4f translate = translatem4f(attrib->translate);
+	const m4f mv = addm4f(mulm4f(rotate, scale), translate);
+	attrib->mvp = mulm4f(persp, mv);
 }
 
-struct attrib datas;
+static void step(struct attrib *attribs) {
+	for (int i = 0; i < SIZE; i++) {
+		struct attrib *attrib = attribs + i;
+		attrib->scale = mkv3f(1,1,1);
+		const float t = 0.1;
+		const float s = t * (float)i + t;
+		attrib->angle = addv3f(attrib->angle, mkv3f(0.03 * s, 0.02 * s, 0.01 * s));
+		attrib->translate = mkv3f(
+			-3 + (float)(i % 5) * 1.5,
+			-2 + (float)(i / 5) * 1.5, 
+			-6  - (i % 2 ? 2 : 0)
+		);
+	}
+}
+
+static void render(unsigned int width, unsigned int height, struct attrib* attribs) {
+	const m4f persp = perspm4f(45, (float)width / (float)height, 0.01, 100);
+
+	glClearColor(0.2, 0.2, 0.2, 1);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	for (int i = 0; i < SIZE; i++) {
+		struct attrib *attrib = attribs + i;
+		update_mvp(persp, attrib);
+		glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, attrib->mvp.val);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+	}
+}
+
 SDL_Window *window;
 int done;
 
-void loop(SDL_GLContext *cxt) {
+void loop(SDL_GLContext *cxt, struct attrib *attribs) {
 	SDL_Event event;
 	int i;
 	int status;
@@ -272,7 +289,8 @@ void loop(SDL_GLContext *cxt) {
 			SDL_Log("SDL_GL_MakeCurrent(): %s\n", SDL_GetError());
 			// Continue for next window
 		}
-		render(window_w, window_h, &datas);
+		step(attribs);
+		render(window_w, window_h, attribs);
 		SDL_GL_SwapWindow(window);
 	}
 	SDL_Delay(16);
@@ -348,15 +366,15 @@ void setup_gl_viewport(SDL_Window *window) {
 	glViewport(0, 0, w, h);
 }
 	
-void setup_attrib(struct attrib *attrib) {
+void setup_attrib(GLuint program, struct attrib *attrib) {
 	// Setup shaders and bind locations
 	attrib->angle = zerov3f();
-	attrib->program = load_program("res/shader/cube.vert", "res/shader/cube.frag");
+	attrib->program = program;
 	// Get attribute locations of non-fixed attributes like color and texture coordinates.
 	attrib->position = glGetAttribLocation(attrib->program, "av4position");
 	attrib->color = glGetAttribLocation(attrib->program, "av3color");
 	// Get uniform locations
-	attrib->mvp = glGetUniformLocation(attrib->program, "mvp");
+	attrib->matrix = glGetUniformLocation(attrib->program, "mvp");
 	glUseProgram(attrib->program);
 	// Enable attributes for position, color and texture coordinates etc.
 	glEnableVertexAttribArray(attrib->position);
@@ -366,25 +384,31 @@ void setup_attrib(struct attrib *attrib) {
 	glVertexAttribPointer(attrib->color, 3, GL_FLOAT, GL_FALSE, 0, _colors);
 }
 
+
+
 int main(int argc, char *argv[]) {
 	SDL_GLContext context;
+	struct attrib attribs[SIZE];
+
 	init_sdl();
 	init_gl_settings();
 	window = create_window();
-	//Mix_Music *music = Mix_LoadMUS("res/insert_no_coins.xm");
-	Mix_Music *music = Mix_LoadMUS("res/di2.mod");
+	Mix_Music *music = Mix_LoadMUS("res/di2.xm");
 	if (!music) return EXIT_FAILURE;
 	Mix_PlayMusic(music, -1);
 	// Mix_PauseMusic();
 	make_context(&context);
 	setup_gl_viewport(window);
-	setup_attrib(&datas);
+	GLuint program = load_program("res/shader/cube.vert", "res/shader/cube.frag");
+	for (int i = 0; i < SIZE; i++) {
+		setup_attrib(program, &attribs[i]);
+	}
 	// enable filters
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 	// Initialize SDL_mixer 
 	for (done = 0; !done;) {
-		loop(&context);
+		loop(&context, attribs);
 	}
 	// Cleanup
 	Mix_FreeMusic(music);
@@ -416,10 +440,10 @@ void draw_cube(struct attrib *attr, GLuint buf) {
 }
 
 void render_item(struct attrib *attrib) {
-    float matrix[16];
+    float mvp[16];
     //set_matrix_item(matrix, g->width, g->height, g->scale);
     glUseProgram(attrib->program);
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, mvp);
     glUniform3f(attrib->camera, 0, 0, 5);
     glUniform1i(attrib->sampler, 0);
     //glUniform1f(attrib->timer, time_of_day());

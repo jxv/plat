@@ -11,4 +11,5 @@ cp -r res/*.png dist/res
 cp -r res/*.xm dist/res
 cp -r res/*.wav dist/res
 cp -r res/*.txt dist/res
+cp -r res/shader dist/res/shader
 mksquashfs dist plat.opk -all-root -noappend -no-exports -no-xattrs
