@@ -179,7 +179,6 @@ const float _colors[] = {
 	1.0, 0.0, 0.0, // red
 	0.6, 0.0, 0.0, // black
 	0.6, 0.0, 0.4, // blue
-
 	// Left face  -- Blue
 	// Bottom left
 	0.4, 0.0, 0.6, // red
@@ -189,7 +188,6 @@ const float _colors[] = {
 	0.4, 0.0, 0.6, // red
 	0.0, 0.0, 0.6, // black
 	0.0, 0.0, 1.0, // blue
-
 	// Top face -- Green
 	// Bottom left
 	0.4, 0.6, 0.0, // red
@@ -199,7 +197,6 @@ const float _colors[] = {
 	0.4, 0.6, 0.0, // red
 	0.0, 0.6, 0.0, // black
 	0.0, 0.6, 0.4, // blue
-	
 	// Right face -- Yellow
 	// Bottom left
 	1.0, 0.6, 0.0, // red
@@ -209,7 +206,6 @@ const float _colors[] = {
 	1.0, 0.6, 0.0, // red
 	0.6, 0.6, 0.0, // black
 	0.6, 0.6, 0.4, // blue
-	
 	// Back face -- Cyan
 	// Bottom left
 	0.4, 0.6, 0.6, // red
@@ -219,7 +215,6 @@ const float _colors[] = {
 	0.4, 0.6, 0.6, // red
 	0.0, 0.6, 0.6, // black
 	0.0, 0.6, 1.0, // blue
-	
 	// Bottom face -- Magenta
 	// Bottom left
 	1.0, 0.0, 0.6, // red
@@ -234,9 +229,9 @@ const float _colors[] = {
 void update_mvp(const m4f persp, struct attrib *attrib) {
 	const m4f scale = scalem4f(eyem4f(), attrib->scale);
 	m4f rotate;
-	rotate = mulm4f(rotm4f(attrib->angle.x, mkv3f(1,0,0)), eyem4f());
-	rotate = mulm4f(rotm4f(attrib->angle.y, mkv3f(0,1,0)), rotate);
-	rotate = mulm4f(rotm4f(attrib->angle.z, mkv3f(0,0,1)), rotate);
+	rotate = mulm4f(rotm4f(attrib->angle.x, _v3f(1,0,0)), eyem4f());
+	rotate = mulm4f(rotm4f(attrib->angle.y, _v3f(0,1,0)), rotate);
+	rotate = mulm4f(rotm4f(attrib->angle.z, _v3f(0,0,1)), rotate);
 	const m4f translate = translatem4f(attrib->translate);
 	const m4f mv = addm4f(mulm4f(rotate, scale), translate);
 	attrib->mvp = mulm4f(persp, mv);
@@ -245,11 +240,11 @@ void update_mvp(const m4f persp, struct attrib *attrib) {
 static void step(struct attrib *attribs) {
 	for (int i = 0; i < SIZE; i++) {
 		struct attrib *attrib = attribs + i;
-		attrib->scale = mkv3f(1,1,1);
+		attrib->scale = _v3f(1,1,1);
 		const float t = 0.1;
 		const float s = t * (float)i + t;
-		attrib->angle = addv3f(attrib->angle, mkv3f(0.03 * s, 0.02 * s, 0.01 * s));
-		attrib->translate = mkv3f(
+		attrib->angle = addv3f(attrib->angle, _v3f(0.03 * s, 0.02 * s, 0.01 * s));
+		attrib->translate = _v3f(
 			-3 + (float)(i % 5) * 1.5,
 			-2 + (float)(i / 5) * 1.5, 
 			-6  - (i % 2 ? 2 : 0)
@@ -257,15 +252,19 @@ static void step(struct attrib *attribs) {
 	}
 }
 
-static void render(unsigned int width, unsigned int height, struct attrib* attribs) {
+static void render(unsigned int width, unsigned int height,
+		   struct attrib* attribs) {
 	const m4f persp = perspm4f(45, (float)width / (float)height, 0.01, 100);
 
 	glClearColor(0.2, 0.2, 0.2, 1);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT |
+		GL_DEPTH_BUFFER_BIT |
+		GL_STENCIL_BUFFER_BIT);
 	for (int i = 0; i < SIZE; i++) {
 		struct attrib *attrib = attribs + i;
 		update_mvp(persp, attrib);
-		glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, attrib->mvp.val);
+		glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE,
+				   attrib->mvp.val);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 	}
 }
@@ -279,7 +278,8 @@ void loop(SDL_GLContext *cxt, struct attrib *attribs) {
 	int status;
 	// Check for events 
 	while (SDL_PollEvent(&event) && !done) {
-		if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+		if (event.type == SDL_KEYDOWN &&
+		    event.key.keysym.sym == SDLK_ESCAPE) {
 		    done = true;
 		}
 	}
@@ -317,16 +317,19 @@ void init_gl_settings() {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
         //SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+			    SDL_GL_CONTEXT_PROFILE_ES);
 }
 
 void init_sdl() {
 	if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-		fprintf(stderr, "Couldn't initialize audio: %s\n", SDL_GetError());
+		fprintf(stderr, "Couldn't initialize audio: %s\n",
+			SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
         if (SDL_VideoInit(NULL) < 0) {
-		fprintf(stderr, "Couldn't initialize video driver: %s\n", SDL_GetError());
+		fprintf(stderr, "Couldn't initialize video driver: %s\n",
+			SDL_GetError());
 		exit(EXIT_FAILURE);
         }
 	if (Mix_OpenAudio( 22050, MIX_DEFAULT_FORMAT, 2, 4096 ) == -1) {
@@ -359,18 +362,18 @@ void make_context(SDL_GLContext *cxt) {
 	}
 }
 
-
 void setup_gl_viewport(SDL_Window *window) {
 	int w, h;
 	SDL_GL_GetDrawableSize(window, &w, &h);
 	glViewport(0, 0, w, h);
 }
-	
+
 void setup_attrib(GLuint program, struct attrib *attrib) {
 	// Setup shaders and bind locations
 	attrib->angle = zerov3f();
 	attrib->program = program;
-	// Get attribute locations of non-fixed attributes like color and texture coordinates.
+	// Get attribute locations of non-fixed attributes like color
+	// and texture coordinates.
 	attrib->position = glGetAttribLocation(attrib->program, "av4position");
 	attrib->color = glGetAttribLocation(attrib->program, "av3color");
 	// Get uniform locations
@@ -380,7 +383,8 @@ void setup_attrib(GLuint program, struct attrib *attrib) {
 	glEnableVertexAttribArray(attrib->position);
 	glEnableVertexAttribArray(attrib->color);
 	//
-	glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE, 0, _vertices);
+	glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE, 0,
+			      _vertices);
 	glVertexAttribPointer(attrib->color, 3, GL_FLOAT, GL_FALSE, 0, _colors);
 }
 
@@ -399,7 +403,8 @@ int main(int argc, char *argv[]) {
 	// Mix_PauseMusic();
 	make_context(&context);
 	setup_gl_viewport(window);
-	GLuint program = load_program("res/shader/cube.vert", "res/shader/cube.frag");
+	GLuint program = load_program("res/shader/cube.vert",
+				      "res/shader/cube.frag");
 	for (int i = 0; i < SIZE; i++) {
 		setup_attrib(program, &attribs[i]);
 	}
@@ -470,14 +475,14 @@ m4f set_matrix_item(int width, int height, int scale) {
 	const float xoffset = 1 - size / width * 2;
 	const float yoffset = 1 - size / height * 2;
 	m4f a = eyem4f();
-	m4f b = rotm4f(0, mkv3f(1, 0, -M_PI / 4));
+	m4f b = rotm4f(0, _v3f(1, 0, -M_PI / 4));
 	a = mulm4f(a, b);
-	b = rotm4f(1, mkv3f(0, 0, -M_PI / 9));
+	b = rotm4f(1, _v3f(0, 0, -M_PI / 9));
 	a = mulm4f(a, b);
 	b = orthom4f(-box * aspect, box * aspect, -box, box, -1, 1);
 	// b = perspm4f(45, (float)width / (float)height, 0.01, 100);
 	a = mulm4f(b, a);
-	b = translatem4f(mkv3f(-xoffset, -yoffset, 0));
+	b = translatem4f(_v3f(-xoffset, -yoffset, 0));
 	a = mulm4f(b, a);
 	return mulm4f(eyem4f(), a);
 }
